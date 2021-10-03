@@ -1,64 +1,42 @@
-import 'dart:io';
-
-import 'package:logger/logger.dart';
 import 'package:path/path.dart' as path;
 
+import 'aw_storage_service.dart';
+import 'console_log.dart';
+import 'constants.dart';
 import 'drop_box.dart';
-
-// TODO: paste your dropbox oauth2 token here
-final String token = '';
-
-// should enable logging?
-final bool enableLogging = true;
-
-final _log = Logger(
-  printer: PrettyPrinter(
-    methodCount: 1,
-    printEmojis: false,
-  ),
-);
+import 'file_utility.dart';
 
 void main(List<String> arguments) async {
   log('--- starting ---');
 
-  /// pass your file here to upload
-  final _file = File('tpl.docx');
+  try {
+    // load all cloud files available to backup
+    final files = await appwriteStorageService();
 
-  log(_file);
+    for (var file in files) {
+      // path should start with '/' -> /test.dart
+      // automatically using file basename as cloud file path on dropbox
+      final pathOfFile = '/' + path.basename(file.path);
 
-  // path should start with '/' -> /test.dart
-  // automatically using file basename as cloud file path on dropbox
-  final pathOfFile = '/' + path.basename(_file.path);
+      final dropBox = DropBox(path: pathOfFile, dropBoxToken: token);
 
-  final dropBox = DropBox(path: pathOfFile, dropBoxToken: token);
+      final result = await dropBox.upload(file);
 
-  final result = await dropBox.upload(_file);
+      print(result);
 
-  print(result.toString());
-}
-
-/// nothing too fancy, probably redundancy
-void log(var data, [String? type]) {
-  if (enableLogging) {
-    if (type == null) {
-      _log.i(data.toString());
+      log(result.toString());
     }
 
-    // switch
-    else {
-      switch (type) {
-        case 'i':
-          _log.i(data.toString());
-          break;
-        case 'd':
-          _log.d(data.toString());
-          break;
-        case 'e':
-          _log.e(data.toString());
-          break;
-        default:
-          _log.i(data.toString());
-      }
-    }
+    // clean up saved files
+    await deleteSavedFileOffline(files);
   }
+
+  // err
+  catch (e) {
+    log(e, 'e');
+
+    print('[ERROR] There was a problem: ${e.toString()}');
+  }
+
+  print('[INFO] Done!');
 }
